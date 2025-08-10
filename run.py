@@ -6,26 +6,34 @@ from edge_tts import VoicesManager
 from tika import parser
 from moviepy.editor import AudioFileClip, concatenate_audioclips
 
-audio_files = [] 
-
 
 class TextToSpeech:
-    def __init__(self, text, voices, output_dir='output'):
+    """Simple wrapper around edge_tts for converting text to speech."""
+
+    def __init__(self, text, voices, output_dir="output"):
         self.text = text
         self.voices = voices
         self.output_dir = output_dir
 
     async def generate_audio(self):
+        """Generate audio files for the configured voices.
+
+        Returns
+        -------
+        list[str]
+            Paths to the generated audio files.
+        """
         os.makedirs(self.output_dir, exist_ok=True)
 
+        output_paths = []
         for voice in self.voices:
             communicate = edge_tts.Communicate(self.text, voice)
             output_file = f"{uuid4()}.mp3"
-
             output_path = os.path.join(self.output_dir, output_file)
             await communicate.save(output_path)
+            output_paths.append(output_path)
 
-            audio_files.append(output_path)
+        return output_paths
 
     def set_text(self, text):
         self.text = text
@@ -61,9 +69,10 @@ async def read_book(path: str, chunk_size=500) -> str:
     chunks = [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
     output_dir = path.replace(" ", "_").replace(".", "_")
 
+    audio_files = []
     for chunk in chunks:
         tts = TextToSpeech(chunk, ["en-US-GuyNeural"], output_dir=output_dir)
-        await tts.generate_audio()
+        audio_files.extend(await tts.generate_audio())
 
     audio_clips = [AudioFileClip(audio_file) for audio_file in audio_files]
     final_audio = concatenate_audioclips(audio_clips)
