@@ -43,13 +43,13 @@ async def read_book(path: str, progress_bar, chunk_size=500) -> str:
     output_dir = path.replace(" ", "_").replace(".", "_")
     os.makedirs(output_dir, exist_ok=True)
 
+    audio_files = []
     for i, chunk in enumerate(chunks):
         tts = TextToSpeech(chunk, ["en-US-GuyNeural"], output_dir=output_dir)
-        await tts.generate_audio()
+        audio_files.extend(await tts.generate_audio())
         progress_bar.progress((i + 1) / len(chunks))
 
-    audio_clips = [AudioFileClip(audio_file)
-                   for audio_file in TextToSpeech.audio_files]
+    audio_clips = [AudioFileClip(audio_file) for audio_file in audio_files]
     final_audio = concatenate_audioclips(audio_clips)
 
     final_audio_file = f"final-{output_dir}.mp3"
@@ -59,21 +59,31 @@ async def read_book(path: str, progress_bar, chunk_size=500) -> str:
 
 
 class TextToSpeech:
-    audio_files = []
+    """Simple wrapper around edge_tts for converting text to speech."""
 
-    def __init__(self, text, voices, output_dir='output'):
+    def __init__(self, text, voices, output_dir="output"):
         self.text = text
         self.voices = voices
         self.output_dir = output_dir
 
     async def generate_audio(self):
+        """Generate audio files for the configured voices.
+
+        Returns
+        -------
+        list[str]
+            Paths to the generated audio files.
+        """
         os.makedirs(self.output_dir, exist_ok=True)
 
+        output_paths = []
         for voice in self.voices:
             communicate = edge_tts.Communicate(self.text, voice)
             output_file = os.path.join(self.output_dir, f"{uuid4()}.mp3")
             await communicate.save(output_file)
-            TextToSpeech.audio_files.append(output_file)
+            output_paths.append(output_file)
+
+        return output_paths
 
 
 if __name__ == "__main__":
